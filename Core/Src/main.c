@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "liquidcrystal_i2c.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -96,7 +97,6 @@ int main(void)
 
   /* USER CODE END SysInit */
 
-
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
@@ -111,7 +111,7 @@ int main(void)
 
    HD44780_Clear();
    HD44780_SetCursor(0,0);
-   HD44780_PrintStr("привет");
+   HD44780_PrintStr("HELLO");
    HAL_Delay(2000);
    HD44780_NoBacklight();
    HAL_Delay(2000);
