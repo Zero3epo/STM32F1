@@ -29,3 +29,5 @@ liquidcrystal_i2c.c:256:13:ExpanderWrite	1
 liquidcrystal_i2c.c:262:13:PulseEnable	1
 liquidcrystal_i2c.c:271:13:DelayInit	1
 liquidcrystal_i2c.c:287:13:DelayUS	2
+liquidcrystal_i2c.c:300:16:utf8_to_cp866	11
+liquidcrystal_i2c.c:343:6:HD44780_PrintRus	4

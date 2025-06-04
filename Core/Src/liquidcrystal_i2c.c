@@ -206,12 +206,9 @@ void HD44780_LoadCustomCharacter(uint8_t char_num, uint8_t *rows)
   HD44780_CreateSpecialChar(char_num, rows);
 }
 
-void HD44780_PrintStr(const char c[]) {
-    const char *p = c;
-    while(*p) {
-        uint8_t ch = utf8_to_cp866(&p);
-        SendChar(ch);
-    }
+void HD44780_PrintStr(const char c[])
+{
+  while(*c) SendChar(*c++);
 }
 
 void HD44780_SetBacklight(uint8_t new_val)

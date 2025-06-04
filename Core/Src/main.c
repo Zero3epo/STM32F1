@@ -30,7 +30,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define SLAVE_ADDRESS_LCD 0x38
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -53,6 +53,20 @@ const osThreadAttr_t defaultTask_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for BTNTask */
+osThreadId_t BTNTaskHandle;
+const osThreadAttr_t BTNTask_attributes = {
+  .name = "BTNTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
+/* Definitions for LCDTask */
+osThreadId_t LCDTaskHandle;
+const osThreadAttr_t LCDTask_attributes = {
+  .name = "LCDTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -62,6 +76,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 void StartDefaultTask(void *argument);
+void StartTask02(void *argument);
+void StartTask03(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -101,55 +117,9 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-   HD44780_Init(2);
-   HD44780_Clear();
-   HD44780_SetCursor(0,0);
-   HD44780_PrintStr("привет");
-   HD44780_SetCursor(10,1);
-   HD44780_PrintStr("мир");
-   HAL_Delay(2000);
-
-   HD44780_Clear();
-   HD44780_SetCursor(0,0);
-   HD44780_PrintStr("HELLO");
-   HAL_Delay(2000);
-   HD44780_NoBacklight();
-   HAL_Delay(2000);
-   HD44780_Backlight();
-
-   HAL_Delay(2000);
-   HD44780_Cursor();
-   HAL_Delay(2000);
-   HD44780_Blink();
-   HAL_Delay(5000);
-   HD44780_NoBlink();
-   HAL_Delay(2000);
-   HD44780_NoCursor();
-   HAL_Delay(2000);
-
-   HD44780_NoDisplay();
-   HAL_Delay(2000);
-   HD44780_Display();
-
-   HD44780_Clear();
-   HD44780_SetCursor(0,0);
-   HD44780_PrintStr("Learning STM32 with LCD is fun :-)");
-   int x;
-   for(int x=0; x<40; x=x+1)
-   {
-     HD44780_ScrollDisplayLeft();  //HD44780_ScrollDisplayRight();
-     HAL_Delay(500);
-   }
-
-   char snum[5];
-   for ( int x = 1; x <= 200 ; x++ )
-   {
-     itoa(x, snum, 10);
-     HD44780_Clear();
-     HD44780_SetCursor(0,0);
-     HD44780_PrintStr(snum);
-     HAL_Delay (1000);
-   }
+  HD44780_Init(2);
+  HD44780_Clear();
+  HD44780_SetCursor(0,0);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -174,6 +144,12 @@ int main(void)
   /* Create the thread(s) */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* creation of BTNTask */
+  BTNTaskHandle = osThreadNew(StartTask02, NULL, &BTNTask_attributes);
+
+  /* creation of LCDTask */
+  LCDTaskHandle = osThreadNew(StartTask03, NULL, &LCDTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -289,7 +265,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
@@ -317,17 +293,64 @@ static void MX_GPIO_Init(void)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
+	uint8_t previous_button_state = GPIO_PIN_SET;
+  /* Infinite loop */
+	for(;;)
+	  {
+		uint8_t current_button_state = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_14);
+
+		        // Если кнопка нажата (LOW), включаем светодиод
+		        if(current_button_state == GPIO_PIN_RESET)
+		        {
+		            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET); // Включить светодиод
+		            HD44780_PrintStr("BTN has push");
+		        }
+		        else
+		        {
+		            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET); // Выключить светодиод
+		            HD44780_PrintStr("BTN has don't push");
+		        }
+
+		        previous_button_state = current_button_state;
+		        osDelay(10); // Опрос каждые 10 мс
+	  }
+  /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartTask02 */
+/**
+* @brief Function implementing the BTNTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTask02 */
+void StartTask02(void *argument)
+{
+  /* USER CODE BEGIN StartTask02 */
   /* Infinite loop */
   for(;;)
   {
-	  if(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_14) == GPIO_PIN_SET) {
-		  	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-	  }else {
-		  	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
-	  }
-
+    osDelay(1);
   }
-  /* USER CODE END 5 */
+  /* USER CODE END StartTask02 */
+}
+
+/* USER CODE BEGIN Header_StartTask03 */
+/**
+* @brief Function implementing the LCDTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTask03 */
+void StartTask03(void *argument)
+{
+  /* USER CODE BEGIN StartTask03 */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartTask03 */
 }
 
 /**
