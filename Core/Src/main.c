@@ -120,6 +120,8 @@ int main(void)
   HD44780_Init(2);
   HD44780_Clear();
   HD44780_SetCursor(0,0);
+
+  HD44780_PrintStr("BTN has don't push");
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -294,6 +296,7 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
 	uint8_t previous_button_state = GPIO_PIN_SET;
+	uint8_t inte = 0;
   /* Infinite loop */
 	for(;;)
 	  {
@@ -303,17 +306,24 @@ void StartDefaultTask(void *argument)
 		        if(current_button_state == GPIO_PIN_RESET)
 		        {
 		            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET); // Включить светодиод
-		            HD44780_PrintStr("BTN has push");
+		            inte = 1;
 		        }
 		        else
 		        {
 		            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET); // Выключить светодиод
-		            HD44780_PrintStr("BTN has don't push");
+		            inte = 0;
 		        }
 
 		        previous_button_state = current_button_state;
 		        osDelay(10); // Опрос каждые 10 мс
 	  }
+		if(inte == 1) {
+			HD44780_PrintStr("BTN has push");
+		}else {
+			HD44780_PrintStr("BTN has don't push");
+		}
+
+
   /* USER CODE END 5 */
 }
 
