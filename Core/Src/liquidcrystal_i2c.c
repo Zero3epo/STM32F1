@@ -1,5 +1,5 @@
 #include "liquidcrystal_i2c.h"
-
+#include <stdint.h>
 extern I2C_HandleTypeDef hi2c1;
 
 uint8_t dpFunction;
@@ -206,9 +206,12 @@ void HD44780_LoadCustomCharacter(uint8_t char_num, uint8_t *rows)
   HD44780_CreateSpecialChar(char_num, rows);
 }
 
-void HD44780_PrintStr(const char c[])
-{
-  while(*c) SendChar(*c++);
+void HD44780_PrintStr(const char c[]) {
+    const char *p = c;
+    while(*p) {
+        uint8_t ch = utf8_to_cp866(&p);
+        SendChar(ch);
+    }
 }
 
 void HD44780_SetBacklight(uint8_t new_val)
@@ -293,4 +296,63 @@ static void DelayUS(uint32_t us) {
   {
     cnt = DWT->CYCCNT - start;
   } while(cnt < cycles);
+}
+
+
+// Таблица перекодировки русских букв из UTF-8 в CP866
+static uint8_t utf8_to_cp866(const char **str) {
+    uint8_t result = (*str)[0];
+
+    // Базовые ASCII символы (0x00-0x7F)
+    if(result < 0x80) {
+        (*str)++;
+        return result;
+    }
+
+    // Русские буквы в UTF-8 (начало с 0xD0 или 0xD1)
+    if((*str)[0] == 0xD0) {
+        // Буквы А-Я (кроме Ё)
+        if((*str)[1] >= 0x90 && (*str)[1] <= 0xBF) {
+            result = (*str)[1] - 0x10;
+            (*str) += 2;
+            return result;
+        }
+    } else if((*str)[0] == 0xD1) {
+        // Буквы а-п
+        if((*str)[1] >= 0x80 && (*str)[1] <= 0x8F) {
+            result = (*str)[1] + 0x60;
+            (*str) += 2;
+            return result;
+        }
+        // Буква ё
+        else if((*str)[1] == 0x91) {
+            result = 0xF0;
+            (*str) += 2;
+            return result;
+        }
+        // Буквы р-я
+        else if((*str)[1] >= 0x92 && (*str)[1] <= 0x9F) {
+            result = (*str)[1] + 0x60;
+            (*str) += 2;
+            return result;
+        }
+    }
+
+    // Если символ не распознан как русская буква, пропускаем его
+    (*str)++;
+    return '?'; // или можно вернуть 0x20 (пробел)
+}
+
+void HD44780_PrintRus(const char *str) {
+    const char *p = str;
+    while(*p) {
+        uint8_t ch = utf8_to_cp866(&p);
+        if(ch == 0xF0) { // Ё
+            SendChar(0); // Первый кастомный символ
+        } else if(ch == 0xF1) { // ё
+            SendChar(1); // Второй кастомный символ
+        } else {
+            SendChar(ch);
+        }
+    }
 }

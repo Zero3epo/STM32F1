@@ -13,6 +13,8 @@
 #define LCD_SETCGRAMADDR 0x40
 #define LCD_SETDDRAMADDR 0x80
 
+#define HD44780_CYRILLIC 1
+
 /* Entry Mode */
 #define LCD_ENTRYRIGHT 0x00
 #define LCD_ENTRYLEFT 0x02
