@@ -48,6 +48,10 @@ I2C_HandleTypeDef hi2c1;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
+
+osSemaphoreId_t buttonSemaphoreHandle;
+
+
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
   .stack_size = 128 * 4,
@@ -67,6 +71,13 @@ const osThreadAttr_t LCDTask_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for holdLED */
+osThreadId_t holdLEDHandle;
+const osThreadAttr_t holdLED_attributes = {
+  .name = "holdLED",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityBelowNormal,
+};
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -76,8 +87,9 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 void StartDefaultTask(void *argument);
-void StartTask02(void *argument);
-void StartTask03(void *argument);
+void buttonTask(void *argument);
+void ledTask(void *argument);
+void lcdTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -86,6 +98,15 @@ void StartTask03(void *argument);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+/*const osMessageQueueAttr_t buttonQueue_attributes = {
+  .name = "buttonQueue"
+}; */
+
+const osSemaphoreAttr_t buttonSemaphore_attributes = {
+  .name = "buttonSemaphore"
+};
+
+//volatile uint8_t button_pressed = 0;
 /* USER CODE END 0 */
 
 /**
@@ -104,6 +125,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -117,11 +139,11 @@ int main(void)
   MX_GPIO_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  HD44780_Init(2);
-  HD44780_Clear();
-  HD44780_SetCursor(0,0);
-
-  HD44780_PrintStr("BTN has don't push");
+    HD44780_Init(2);
+    HD44780_Clear();
+    HD44780_SetCursor(0,0);
+    HD44780_PrintStr("BTN don't push");
+   /* buttonQueueHandle = osMessageQueueNew(1, sizeof(uint8_t), &buttonQueue_attributes); */
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -133,6 +155,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
+  buttonSemaphoreHandle = osSemaphoreNew(1, 0, &buttonSemaphore_attributes);
   /* USER CODE END RTOS_SEMAPHORES */
 
   /* USER CODE BEGIN RTOS_TIMERS */
@@ -148,10 +171,13 @@ int main(void)
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* creation of BTNTask */
-  BTNTaskHandle = osThreadNew(StartTask02, NULL, &BTNTask_attributes);
+  BTNTaskHandle = osThreadNew(buttonTask, NULL, &BTNTask_attributes);
 
   /* creation of LCDTask */
-  LCDTaskHandle = osThreadNew(StartTask03, NULL, &LCDTask_attributes);
+  LCDTaskHandle = osThreadNew(ledTask, NULL, &LCDTask_attributes);
+
+  /* creation of holdLED */
+  holdLEDHandle = osThreadNew(lcdTask, NULL, &holdLED_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -159,6 +185,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
+
   /* USER CODE END RTOS_EVENTS */
 
   /* Start scheduler */
@@ -220,8 +247,7 @@ static void MX_I2C1_Init(void)
 {
 
   /* USER CODE BEGIN I2C1_Init 0 */
-	  __HAL_RCC_AFIO_CLK_ENABLE();
-	  __HAL_AFIO_REMAP_I2C1_ENABLE();
+
   /* USER CODE END I2C1_Init 0 */
 
   /* USER CODE BEGIN I2C1_Init 1 */
@@ -262,7 +288,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -274,7 +300,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : PB14 */
   GPIO_InitStruct.Pin = GPIO_PIN_14;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
@@ -286,7 +312,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
-/*
+/**
   * @brief  Function implementing the defaultTask thread.
   * @param  argument: Not used
   * @retval None
@@ -295,72 +321,112 @@ static void MX_GPIO_Init(void)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-	uint8_t previous_button_state = GPIO_PIN_SET;
-	uint8_t inte = 0;
   /* Infinite loop */
-	for(;;)
-	  {
-		uint8_t current_button_state = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_14);
-
-		        // Если кнопка нажата (LOW), включаем светодиод
-		        if(current_button_state == GPIO_PIN_RESET)
-		        {
-		            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET); // Включить светодиод
-		            inte = 1;
-		        }
-		        else
-		        {
-		            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET); // Выключить светодиод
-		            inte = 0;
-		        }
-
-		        previous_button_state = current_button_state;
-		        osDelay(10); // Опрос каждые 10 мс
-	  }
-		if(inte == 1) {
-			HD44780_PrintStr("BTN has push");
-		}else {
-			HD44780_PrintStr("BTN has don't push");
-		}
-
-
+  for(;;)
+  {
+    osDelay(1);
+  }
   /* USER CODE END 5 */
 }
 
 /* USER CODE BEGIN Header_StartTask02 */
 /**
-* @brief Function implementing the BTNTask thread.
+* @brief Function implementing the buttonTask thread.
 * @param argument: Not used
 * @retval None
 */
 /* USER CODE END Header_StartTask02 */
-void StartTask02(void *argument)
+void buttonTask(void *argument)
 {
-  /* USER CODE BEGIN StartTask02 */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
-  /* USER CODE END StartTask02 */
+    uint8_t last_state = GPIO_PIN_SET; // предполагаем, что кнопка не нажата
+    for(;;)
+    {
+        uint8_t current_state = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_14);
+        if(current_state != last_state)
+        {
+            last_state = current_state;
+            osSemaphoreRelease(buttonSemaphoreHandle); // сигнал об изменении состояния
+        }
+        osDelay(10);
+    }
 }
 
-/* USER CODE BEGIN Header_StartTask03 */
-/**
-* @brief Function implementing the LCDTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartTask03 */
-void StartTask03(void *argument)
+void ledTask(void *argument)
 {
-  /* USER CODE BEGIN StartTask03 */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
-  /* USER CODE END StartTask03 */
+    uint8_t led_on = 0;
+    for(;;)
+    {
+        // Ждем семафор с таймаутом 100 мс
+        if(osSemaphoreAcquire(buttonSemaphoreHandle, 100) == osOK)
+        {
+            // получили сигнал об изменении, читаем актуальное состояние кнопки
+        }
+        uint8_t button_state = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_14);
+
+        if(button_state == GPIO_PIN_RESET)
+        {
+            // Кнопка нажата — светодиод горит постоянно
+            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+            led_on = 1;
+
+            osDelay(3000);
+        }
+        else
+        {
+            led_on = !led_on;
+            HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, (led_on) ? GPIO_PIN_RESET : GPIO_PIN_SET);
+        }
+    }
+}
+
+void lcdTask(void *argument)
+{
+    uint8_t prev_state = 0xFF;
+    for(;;)
+    {
+        // Ждем семафор с таймаутом 100 мс
+        if(osSemaphoreAcquire(buttonSemaphoreHandle, 100) == osOK)
+        {
+            // получили сигнал об изменении, читаем актуальное состояние кнопки
+        }
+        uint8_t button_state = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_14);
+
+        if(button_state != prev_state)
+        {
+            HD44780_Clear();
+            HD44780_SetCursor(0,0);
+            if(button_state == GPIO_PIN_RESET) {
+                HD44780_PrintStr("door is open");
+
+        }else {
+        	int time = 3;
+        	char buffer[20];
+
+        	HD44780_Clear();
+        	HD44780_PrintStr("door will be");
+        	HD44780_SetCursor(0,1);
+
+        	for (; time > 0; time--) {
+            	HD44780_Clear();
+                HD44780_SetCursor(0,0);
+            	HD44780_PrintStr("door will be");
+            	HD44780_SetCursor(0,1);
+                sprintf(buffer, "close in: %d", time);
+                HD44780_PrintStr(buffer);
+                osDelay(900);
+        	}
+           	HD44780_Clear();
+        	HD44780_SetCursor(0,0);
+        	HD44780_PrintStr("door is close");
+
+
+        }
+
+            prev_state = button_state;
+
+        }
+        osDelay(50);
+    }
 }
 
 /**
